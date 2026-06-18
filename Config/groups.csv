@@ -1,0 +1,24 @@
+Name,Scope,Category,OUGroup,GroupType
+GG_Department_IT,Global,Security,Department Groups,Department
+GG_Department_Helpdesk,Global,Security,Department Groups,Department
+GG_Department_Finance,Global,Security,Department Groups,Department
+GG_Department_HR,Global,Security,Department Groups,Department
+GG_Department_Operations,Global,Security,Department Groups,Department
+GG_Department_Management,Global,Security,Department Groups,Department
+GG_Department_Security,Global,Security,Department Groups,Department
+GG_Department_Sales,Global,Security,Department Groups,Department
+GG_FileShare_Finance_RO,Global,Security,Access Groups,Access
+GG_FileShare_Finance_RW,Global,Security,Access Groups,Access
+GG_FileShare_HR_RO,Global,Security,Access Groups,Access
+GG_FileShare_HR_RW,Global,Security,Access Groups,Access
+GG_FileShare_IT_RO,Global,Security,Access Groups,Access
+GG_FileShare_IT_RW,Global,Security,Access Groups,Access
+GG_FileShare_Public_RW,Global,Security,Access Groups,Access
+GG_VPN_Users,Global,Security,Access Groups,Access
+GG_Mail_Users,Global,Security,Access Groups,Access
+GG_Helpdesk_Operators,Global,Security,Security Groups,Operations
+GG_Workstation_Admins,Global,Security,Security Groups,Operations
+GG_Server_Operators,Global,Security,Security Groups,Operations
+GG_IT_Admins,Global,Security,Security Groups,Operations
+GG_SIEM_Analysts,Global,Security,Security Groups,Operations
+GG_Security_Investigators,Global,Security,Security Groups,Operations

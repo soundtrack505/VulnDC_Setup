@@ -1,0 +1,24 @@
+{
+  "_comment": "BlueTeam-CTF-Lab configuration. LAB / ISOLATED USE ONLY. Fake values only.",
+  "DomainDnsName": "",
+  "NetbiosName": "",
+  "LabRootPath": "C:\\BlueTeam-CTF-Lab",
+  "DefaultUserPassword": "LabP@ssw0rd!2026",
+  "CreateComputerObjects": true,
+  "CreateSmbShares": false,
+  "Departments": [
+    "IT", "Helpdesk", "Finance", "HR", "Operations", "Management", "Security", "Sales"
+  ],
+  "HostPlan": [
+    { "Host": "DC01",      "Role": "Domain Controller", "IP": "10.10.10.10" },
+    { "Host": "WS01",      "Role": "Workstation",       "IP": "10.10.10.21" },
+    { "Host": "WS02",      "Role": "Workstation",       "IP": "10.10.10.22" },
+    { "Host": "SIEM01",    "Role": "SIEM Collector",    "IP": "10.10.10.50" },
+    { "Host": "MAILSIM01", "Role": "Mail Simulation",   "IP": "10.10.10.60" },
+    { "Host": "FW01",      "Role": "Firewall",          "IP": "10.10.10.1"  }
+  ],
+  "NetworkPlan": {
+    "ExternalAttackerIP": "203.0.113.50",
+    "SuspiciousDomain": "update-service-lab.example"
+  }
+}

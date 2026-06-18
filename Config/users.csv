@@ -1,0 +1,38 @@
+SamAccountName,DisplayName,Department,Title,AccountType,Enabled
+alice.cohen,Alice Cohen,IT,IT Systems Engineer,Standard,TRUE
+amit.katz,Amit Katz,IT,IT Support Engineer,Standard,TRUE
+koby.shemesh,Koby Shemesh,IT,Network Administrator,Standard,TRUE
+dan.levi,Dan Levi,Helpdesk,Helpdesk Technician,Standard,TRUE
+noam.peretz,Noam Peretz,Helpdesk,Helpdesk Technician,Standard,TRUE
+tal.shahar,Tal Shahar,Helpdesk,Helpdesk Team Lead,Standard,TRUE
+maya.bitton,Maya Bitton,Finance,Financial Analyst,Standard,TRUE
+yael.dahan,Yael Dahan,Finance,Accountant,Standard,TRUE
+gil.oren,Gil Oren,Finance,Finance Manager,Standard,TRUE
+efrat.naor,Efrat Naor,Finance,Payroll Specialist,Standard,TRUE
+shir.azulai,Shir Azulai,HR,HR Specialist,Standard,TRUE
+rina.mor,Rina Mor,HR,HR Coordinator,Standard,TRUE
+moran.tal,Moran Tal,HR,Recruiter,Standard,TRUE
+ron.mizrahi,Ron Mizrahi,Operations,Operations Specialist,Standard,TRUE
+eitan.gabay,Eitan Gabay,Operations,Operations Analyst,Standard,TRUE
+shai.levin,Shai Levin,Operations,Logistics Coordinator,Standard,TRUE
+lior.benami,Lior Ben-Ami,Management,Department Manager,Standard,TRUE
+sigal.barak,Sigal Barak,Management,Director,Standard,TRUE
+omer.shapir,Omer Shapir,Security,SOC Analyst,Standard,TRUE
+hadas.ilan,Hadas Ilan,Security,Security Engineer,Standard,TRUE
+nir.regev,Nir Regev,Sales,Sales Representative,Standard,TRUE
+dana.salem,Dana Salem,Sales,Sales Representative,Standard,TRUE
+tomer.azran,Tomer Azran,Sales,Account Executive,Standard,TRUE
+avi.bendavid,Avi Ben-David,Sales,Sales Manager,Standard,TRUE
+adm.yossi,Yossi (Admin),IT,IT Administrator,Admin,TRUE
+adm.dana,Dana (Admin),Helpdesk,Helpdesk Administrator,Admin,TRUE
+adm.itmanager,IT Manager (Admin),IT,IT Manager,Admin,TRUE
+svc_backup,svc_backup,IT,Service Account,Service,TRUE
+svc_sql,svc_sql,IT,Service Account,Service,TRUE
+svc_web,svc_web,IT,Service Account,Service,TRUE
+svc_iis,svc_iis,IT,Service Account,Service,TRUE
+svc_monitoring,svc_monitoring,IT,Service Account,Service,TRUE
+svc_deploy,svc_deploy,IT,Service Account,Service,TRUE
+old.user1,old.user1,Operations,Legacy/Disabled,Disabled,FALSE
+old.user2,old.user2,Operations,Legacy/Disabled,Disabled,FALSE
+legacy.backup,legacy.backup,Operations,Legacy/Disabled,Disabled,FALSE
+former.admin,former.admin,Operations,Legacy/Disabled,Disabled,FALSE

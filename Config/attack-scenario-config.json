@@ -1,0 +1,101 @@
+{
+  "_comment": "BlueTeam-CTF-Lab :: 02-Create-Attack-Scenarios.ps1 RUNTIME config. LAB / ISOLATED USE ONLY.",
+  "_safety": "Every 'true' below stages a SAFE vulnerable condition or a BENIGN artifact. Nothing here exploits, dumps real creds, or runs an attack.",
+
+  "Domain": {
+    "AutoDetect": true,
+    "DnsRoot": "lab.local",
+    "NetBIOS": "LAB"
+  },
+  "Scope": {
+    "AutoDetectFromFoundation": true,
+    "LabOuDn": "OU=Lab,DC=lab,DC=local"
+  },
+  "Paths": {
+    "LabRoot": "C:\\BlueTeam-CTF-Lab"
+  },
+
+  "Network": {
+    "DC01": "10.10.10.10",
+    "WS01": "10.10.10.21",
+    "WS02": "10.10.10.22",
+    "SIEM01": "10.10.10.50",
+    "MAILSIM01": "10.10.10.60",
+    "FW01": "10.10.10.1",
+    "ExternalAttackerIP": "203.0.113.50",
+    "SuspiciousDomain": "update-service-lab.example"
+  },
+
+  "Modules": {
+    "EnablePhishingArtifacts": true,
+    "EnableKerberoastingUser": true,
+    "EnableASREPRoastingUser": true,
+    "EnableVulnerableDACL": true,
+    "EnableExcessiveGroupMembership": true,
+    "EnableLocalAdminMisconfiguration": true,
+    "EnableWeakCredentialsShare": true,
+    "EnableScheduledTaskPersistence": true,
+    "EnableBackdoorDomainUser": true,
+    "EnableGPOOrACLPersistence": true,
+    "EnableLateralMovementArtifacts": true,
+    "EnableSIEMFriendlyEventGeneration": true,
+    "EnableFirewallLogs": true,
+    "EnableCTFFlags": true,
+    "EnableMITREMapping": true
+  },
+
+  "SafetyToggles": {
+    "_comment": "Defaults favor SAFE behavior. Enable the first two only inside a fully isolated lab you own.",
+    "RegisterScheduledTaskLocally": true,
+    "WriteRealWindowsEventLog": true,
+    "ApplyLocalAdminRemotely": false
+  },
+
+  "Parameters": {
+    "RestoreDefaultPassword": "LabP@ssw0rd!2026",
+
+    "PhishingTargetUser": "alice.cohen",
+    "PhishingVictimHost": "WS01",
+    "PhishingSenderAddress": "billing@update-service-lab.example",
+    "PhishingSubject": "Outstanding Invoice - June 2026",
+    "PhishingAttachmentName": "Invoice_June_2026.docm",
+    "PhishingUrl": "http://update-service-lab.example/invoice/june",
+
+    "KerberoastAccount": "svc_sql",
+    "KerberoastSpns": [ "MSSQLSvc/sql01.lab.local:1433", "HTTP/intranet.lab.local" ],
+    "KerberoastWeakPassword": "Summer2026!",
+
+    "AsrepRoastAccount": "tomer.azran",
+    "AsrepWeakPassword": "Autumn2026!",
+
+    "DaclPrincipalGroup": "GG_AD_Misconfigured_Operators",
+    "DaclTargetUser": "svc_backup",
+    "DaclRight": "GenericAll",
+
+    "ExcessiveMemberGroup": "GG_Helpdesk_Operators",
+    "ExcessiveParentGroup": "GG_Workstation_Admins",
+
+    "LocalAdminHost": "WS01",
+    "LocalAdminPrincipal": "GG_Workstation_Admins",
+
+    "WeakCredShareFolder": "Backup",
+    "WeakCredExposedAccount": "svc_backup",
+    "WeakCredExposedPassword": "B@ckupP@ss2023",
+
+    "ScheduledTaskName": "SystemHealthMonitor",
+    "ScheduledTaskHost": "WS02",
+
+    "BackdoorUser": "svc_update",
+    "BackdoorPassword": "Sup3rSecret!Lab2026",
+    "BackdoorGroup": "GG_IT_Admins",
+
+    "GpoName": "Workstation Maintenance Policy",
+    "GpoDelegateGroup": "GG_Helpdesk_Operators",
+
+    "LateralSourceHost": "WS01",
+    "LateralDestHost": "WS02",
+    "LateralAccount": "svc_backup",
+
+    "TimelineBaseUtc": "2026-06-15T09:00:00"
+  }
+}

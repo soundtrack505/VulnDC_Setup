@@ -1,0 +1,157 @@
+{
+  "_comment": "BlueTeam-CTF-Lab :: vulnerability CATALOG (descriptive metadata for docs/training). LAB ONLY.",
+  "_note": "Runtime toggles + parameters live in attack-scenario-config.json. This file documents each module's risk, MITRE mapping, detection guidance and the CTF question(s) it backs. MITRE IDs flagged 'verify' should be confirmed at attack.mitre.org for your exact scenario.",
+
+  "Modules": [
+    {
+      "Id": "M01",
+      "Name": "Phishing Initial Access Artifacts",
+      "KillChainStage": "Initial Access / Execution",
+      "Mitre": [ "T1566.001", "T1204.002" ],
+      "Risk": "User receives a malicious attachment and executes it, granting the attacker a foothold on WS01.",
+      "WhatIsStaged": "Benign .eml, a harmless attachment placeholder (.docm.txt), recent-files and browser-history endpoint artifacts.",
+      "DetectionHints": [ "Event 4688 powershell.exe spawned by Office app", "Proxy/DNS to suspicious domain", "Mail gateway logs" ],
+      "CtfQuestions": [ "Q01", "Q02", "Q03", "Q04" ]
+    },
+    {
+      "Id": "M02",
+      "Name": "Kerberoastable Service Account",
+      "KillChainStage": "Credential Access",
+      "Mitre": [ "T1558.003" ],
+      "Risk": "Service account has an SPN and a weak password; any domain user can request its TGS and crack it offline.",
+      "WhatIsStaged": "SPN(s) + weak lab password + 'LAB ONLY' description on svc_sql.",
+      "DetectionHints": [ "Event 4769 with RC4 (0x17) encryption for the SPN account", "Unusual TGS volume" ],
+      "CtfQuestions": [ "Q05" ]
+    },
+    {
+      "Id": "M03",
+      "Name": "AS-REP Roastable User",
+      "KillChainStage": "Credential Access",
+      "Mitre": [ "T1558.004" ],
+      "Risk": "Kerberos pre-authentication disabled; attacker can request an AS-REP and crack it offline.",
+      "WhatIsStaged": "DONT_REQ_PREAUTH flag + weak lab password + 'LAB ONLY' description.",
+      "DetectionHints": [ "Event 4768 for a pre-auth-disabled account", "Accounts with DONT_REQ_PREAUTH set" ],
+      "CtfQuestions": [ "Q06" ]
+    },
+    {
+      "Id": "M04",
+      "Name": "Vulnerable DACL",
+      "KillChainStage": "Privilege Escalation",
+      "Mitre": [ "T1098" ],
+      "Risk": "Low-priv group holds GenericAll/WriteDACL over a privileged service account -> password reset / takeover.",
+      "WhatIsStaged": "ACE granting GenericAll to GG_AD_Misconfigured_Operators over svc_backup.",
+      "DetectionHints": [ "Event 5136 directory service object modification", "ACL audits / BloodHound" ],
+      "CtfQuestions": [ "Q07", "Q08" ]
+    },
+    {
+      "Id": "M05",
+      "Name": "Excessive / Nested Group Membership",
+      "KillChainStage": "Privilege Escalation",
+      "Mitre": [ "T1098" ],
+      "Risk": "Helpdesk group nested into Workstation Admins -> unintended privilege inheritance.",
+      "WhatIsStaged": "Group nesting GG_Helpdesk_Operators -> GG_Workstation_Admins (and a secondary path).",
+      "DetectionHints": [ "Event 4728/4732 group member added", "Periodic nested-membership review" ],
+      "CtfQuestions": [ "Q14" ]
+    },
+    {
+      "Id": "M06",
+      "Name": "Local Admin Misconfiguration",
+      "KillChainStage": "Privilege Escalation / Lateral Movement enabler",
+      "Mitre": [ "T1078.002" ],
+      "Risk": "Domain group is local admin on a workstation; via nesting, helpdesk inherits admin -> lateral movement.",
+      "WhatIsStaged": "Documentation artifact (and optional real membership if reachable + toggled).",
+      "DetectionHints": [ "Event 4732 add to local Administrators", "LAPS / local-admin inventory" ],
+      "CtfQuestions": [ "Q10", "Q11" ]
+    },
+    {
+      "Id": "M07",
+      "Name": "Fake Credentials in Share",
+      "KillChainStage": "Credential Access",
+      "Mitre": [ "T1552.001" ],
+      "Risk": "Plaintext (fake) credentials in a readable share enable credential reuse.",
+      "WhatIsStaged": "old_backup_credentials.txt and related files in the Backup share (all FAKE).",
+      "DetectionHints": [ "Event 5140/5145 share access", "DLP / sensitive-file scanning" ],
+      "CtfQuestions": [ "Q09" ]
+    },
+    {
+      "Id": "M08",
+      "Name": "Inert Suspicious Scheduled Task",
+      "KillChainStage": "Persistence",
+      "Mitre": [ "T1053.005" ],
+      "Risk": "Legit-sounding task launching PowerShell at startup is a persistence pattern (action is inert here).",
+      "WhatIsStaged": "Scheduled task whose action only Add-Content's a heartbeat line; plus evidence artifact.",
+      "DetectionHints": [ "Event 4698 scheduled task created", "Autoruns review" ],
+      "CtfQuestions": [ "Q12" ]
+    },
+    {
+      "Id": "M09",
+      "Name": "Inert Backdoor Domain User",
+      "KillChainStage": "Persistence",
+      "Mitre": [ "T1136.002" ],
+      "Risk": "Unmanaged service-like account in a privileged group = stealth persistence (never used by the script).",
+      "WhatIsStaged": "svc_update user + group membership + creation evidence artifact.",
+      "DetectionHints": [ "Event 4720 user created", "Event 4728 add to privileged group", "Accounts created off-process" ],
+      "CtfQuestions": [ "Q13" ]
+    },
+    {
+      "Id": "M10",
+      "Name": "Suspicious GPO / Delegated ACL",
+      "KillChainStage": "Persistence",
+      "Mitre": [ "T1484.001" ],
+      "Risk": "Unlinked GPO (deploys nothing) but low-priv group has edit rights -> future code push capability.",
+      "WhatIsStaged": "Empty unlinked GPO + edit delegation + evidence artifact.",
+      "DetectionHints": [ "GPO change/delegation auditing", "Event 5136 on GPO container" ],
+      "CtfQuestions": [ "Q14" ]
+    },
+    {
+      "Id": "M11",
+      "Name": "Static Lateral-Movement Evidence",
+      "KillChainStage": "Lateral Movement",
+      "Mitre": [ "T1021.002", "T1021.001", "T1087.002", "T1069.002" ],
+      "Risk": "Reconstructable WS01 -> WS02 -> DC01 movement using svc_backup.",
+      "WhatIsStaged": "console_history, remote_commands.log, staged-tool placeholder, admin logon CSV.",
+      "DetectionHints": [ "Event 4624 Type 3", "Event 5140 admin share", "PowerShell 4104" ],
+      "CtfQuestions": [ "Q10", "Q11", "Q15" ]
+    },
+    {
+      "Id": "M12",
+      "Name": "SIEM-Ingestible Kill-Chain Events",
+      "KillChainStage": "All",
+      "Mitre": [ "multiple" ],
+      "Risk": "N/A (evidence generation).",
+      "WhatIsStaged": "killchain_events.{csv,json,cef,leef} + optional real events to Application/BlueTeamCTFLab.",
+      "DetectionHints": [ "Ingest into QRadar/Splunk/Sentinel/FortiSIEM and correlate by time/account/host" ],
+      "CtfQuestions": [ "Q15", "Q16" ]
+    },
+    {
+      "Id": "M13",
+      "Name": "Simulated Firewall / Network Logs",
+      "KillChainStage": "C2 / Exfiltration",
+      "Mitre": [ "T1071", "T1041" ],
+      "Risk": "N/A (evidence generation).",
+      "WhatIsStaged": "firewall_flows.{csv,json,cef,leef} with fake lab IPs + suspicious domain.",
+      "DetectionHints": [ "Outbound to external IP/domain", "Large egress transfer", "Internal SMB pivots" ],
+      "CtfQuestions": [ "Q15" ]
+    },
+    {
+      "Id": "M14",
+      "Name": "CTF Flags / Questions",
+      "KillChainStage": "N/A",
+      "Mitre": [ "-" ],
+      "Risk": "N/A.",
+      "WhatIsStaged": "ctf-flags-operator.md (answers) and ctf-flags-participant.md (blank).",
+      "DetectionHints": [],
+      "CtfQuestions": [ "Q01-Q18" ]
+    },
+    {
+      "Id": "M15",
+      "Name": "MITRE ATT&CK Mapping",
+      "KillChainStage": "N/A",
+      "Mitre": [ "multiple" ],
+      "Risk": "N/A.",
+      "WhatIsStaged": "mitre-mapping.md tying each module to tactic/technique/evidence.",
+      "DetectionHints": [],
+      "CtfQuestions": [ "Q16" ]
+    }
+  ]
+}
