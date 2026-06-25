@@ -15,7 +15,7 @@
     },
     {
       "Id": "M02",
-      "Name": "Kerberoastable Service Account",
+      "Name": "Kerberoastable Service Account",  
       "KillChainStage": "Credential Access",
       "Mitre": [ "T1558.003" ],
       "Risk": "Service account has an SPN and a weak password; any domain user can request its TGS and crack it offline.",
