@@ -552,7 +552,7 @@ function Invoke-M10-GpoPersistence {
     Write-LabLog 'M10: Suspicious GPO / delegation...' 'STEP'; $Script:Counters.Modules++
     try {
         if (-not (Get-Module -ListAvailable -Name GroupPolicy)) {
-            Write-LabLog 'GroupPolicy module unavailable -> writing documentation artifact only.' 'WARN'
+            Write-LabLog 'GroupPolicy module unavailable -> M10 skipped (install RSAT GPMC to enable).' 'WARN'
         } else {
             Import-Module GroupPolicy -ErrorAction Stop
             $gpoName=$Script:P.GpoName; $deleg=$Script:P.GpoDelegateGroup
@@ -568,13 +568,7 @@ function Invoke-M10-GpoPersistence {
                 }
             } else { $Script:Counters.Skipped++ }
         }
-        New-ArtifactFile -Path (Join-Path $Script:Endpoint "DC01\GPO\suspicious_gpo.txt") -Module 'M10-GPO' -Content @"
-[$LabTag] Suspicious GPO evidence
-GPO       : $($Script:P.GpoName)  (UNLINKED, no settings deployed)
-Delegation: $($Script:P.GpoDelegateGroup) has Edit/Modify-Security rights  <-- RISK
-Note      : referenced startup script \\$($Script:Net.DC01)\SYSVOL\...\maintenance.ps1 (NOT deployed in lab)
-"@
-        Add-Summary 'M10 GPO' "$($Script:P.GpoName) editable by $($Script:P.GpoDelegateGroup)" 'GPO edit delegation -> future code push' "Endpoint\DC01\GPO\suspicious_gpo.txt" 'T1484.001'
+        Add-Summary 'M10 GPO' "$($Script:P.GpoName) editable by $($Script:P.GpoDelegateGroup)" 'GPO edit delegation -> low-priv group can modify policy' 'AD: GPO permissions (Get-GPPermission -Name)' 'T1484.001'
         $Script:Counters.Configs++
     } catch { Write-LabLog "M10 failed: $($_.Exception.Message)" 'ERROR'; $Script:Counters.Errors++ }
 }
