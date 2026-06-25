@@ -187,6 +187,32 @@ function Resolve-LabUser {
     return $u
 }
 
+# ----------------------------------------------------------------------------
+#  Clear ALL Windows event logs  (runs automatically at the END of staging)
+# ----------------------------------------------------------------------------
+# Purpose: discard the noisy event-log telemetry produced while BUILDING the lab
+# (account / group / SPN / ACL / scheduled-task creation, etc.) so it never reaches
+# the SIEM. The SIEM-ready evidence lives in Artifacts\SIEM and Artifacts\Firewall
+# (plain files, NOT event logs) and is unaffected. Controlled by
+# SafetyToggles.ClearWindowsLogsAfterStaging (default: true).
+# NOTE: clearing Security/System itself generates Event 1102 / 104.
+function Clear-WindowsEventLogs {
+    Write-LabLog 'Clearing ALL Windows event logs on this host (post-setup baseline)...' 'STEP'
+    $cleared = 0; $skipped = 0
+    try {
+        $logs = & wevtutil el 2>$null
+        foreach ($log in $logs) {
+            try {
+                & wevtutil cl "$log" 2>$null
+                if ($LASTEXITCODE -eq 0) { $cleared++ } else { $skipped++ }
+            } catch { $skipped++ }
+        }
+        Write-LabLog "Windows event logs cleared: $cleared  (skipped/not-clearable: $skipped)" 'OK'
+    } catch {
+        Write-LabLog "Log clear error: $($_.Exception.Message)" 'ERROR'; $Script:Counters.Errors++
+    }
+}
+
 # ============================================================================
 #  MODULE 1 :: Phishing Initial Access Artifacts        T1566.001 / T1204.002
 # ============================================================================
@@ -847,6 +873,14 @@ try {
     Invoke-M14-CtfFlags
     Invoke-M15-Mitre
     Export-Docs
+
+    # FINAL STEP: wipe the host's Windows event logs so the noisy lab-SETUP telemetry
+    # never reaches the SIEM. Runs automatically; disable via the config toggle if needed.
+    # SIEM-ready evidence in Artifacts\SIEM and Artifacts\Firewall is unaffected (those are files).
+    if ($Script:Safe.ClearWindowsLogsAfterStaging -ne $false) {
+        Clear-WindowsEventLogs
+    }
+
     Write-FinalSummary
     Write-LabLog '=== 02-Create-Attack-Scenarios.ps1 completed ===' 'OK'
 }
