@@ -310,7 +310,13 @@ function Invoke-M03-AsrepRoast {
         $u = Resolve-LabUser $acct; if (-not $u) { return }
         # RISK: disabling Kerberos pre-auth lets anyone request an AS-REP whose encrypted part
         # is derived from the user's hash -> offline cracking (AS-REP roasting).
-        Set-ADAccountControl -Identity $acct -DoesNotRequirePreAuthentication $true
+        # Set the DONT_REQ_PREAUTH bit (0x400000) directly on userAccountControl. This is more
+        # portable than 'Set-ADAccountControl -DoesNotRequirePreAuthentication', which is absent
+        # on some ActiveDirectory module versions.
+        $uac = (Get-ADUser -Identity $acct -Properties userAccountControl).userAccountControl
+        if (-not ($uac -band 0x400000)) {
+            Set-ADUser -Identity $acct -Replace @{ userAccountControl = ($uac -bor 0x400000) }
+        }
         Add-State -Type 'PreAuth' -Identity $acct -Data @{ Set=$true } -Module 'M03-AsrepRoast'
         $oldDesc=$u.Description
         Set-ADUser -Identity $acct -Description "LAB ONLY - Intentionally AS-REP Roastable Account [$LabTag]"
