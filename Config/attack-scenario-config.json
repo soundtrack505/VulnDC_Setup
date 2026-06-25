@@ -26,29 +26,32 @@
     "SuspiciousDomain": "update-service-lab.example"
   },
 
+  "_modeComment": "ATTACK-SURFACE-ONLY mode: enable only the modules that create vulnerable CONDITIONS. The team runs the attacks live and generates the real logs. Modules that SIMULATE an attack (phishing evidence, persistence objects, pre-made lateral/SIEM/firewall logs, CTF answers) are OFF.",
   "Modules": {
-    "EnablePhishingArtifacts": true,
+    "EnablePhishingArtifacts": false,
     "EnableKerberoastingUser": true,
     "EnableASREPRoastingUser": true,
     "EnableVulnerableDACL": true,
     "EnableExcessiveGroupMembership": true,
-    "EnableLocalAdminMisconfiguration": true,
-    "EnableWeakCredentialsShare": true,
-    "EnableScheduledTaskPersistence": true,
-    "EnableBackdoorDomainUser": true,
+    "EnableLocalAdminMisconfiguration": false,
+    "EnableWeakCredentialsShare": false,
+    "EnableScheduledTaskPersistence": false,
+    "EnableBackdoorDomainUser": false,
     "EnableGPOOrACLPersistence": true,
-    "EnableLateralMovementArtifacts": true,
-    "EnableSIEMFriendlyEventGeneration": true,
-    "EnableFirewallLogs": true,
-    "EnableCTFFlags": true,
-    "EnableMITREMapping": true
+    "EnableLateralMovementArtifacts": false,
+    "EnableSIEMFriendlyEventGeneration": false,
+    "EnableFirewallLogs": false,
+    "EnableCTFFlags": false,
+    "EnableMITREMapping": false
   },
 
   "SafetyToggles": {
     "_comment": "Defaults favor SAFE behavior. Enable the first two only inside a fully isolated lab you own.",
     "RegisterScheduledTaskLocally": true,
     "WriteRealWindowsEventLog": true,
-    "ApplyLocalAdminRemotely": false
+    "ApplyLocalAdminRemotely": false,
+    "_clearLogsComment": "DESTRUCTIVE: when true (default), ALL Windows event logs on this DC are wiped at the END of staging, so the noisy lab-setup telemetry never reaches the SIEM. Artifacts\\SIEM and Artifacts\\Firewall files are NOT affected. Set false to keep setup logs.",
+    "ClearWindowsLogsAfterStaging": true
   },
 
   "Parameters": {
