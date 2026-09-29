@@ -1,32 +1,34 @@
-# Configure-OneBank-Windows-Logging.ps1
-# Run as Administrator
-#
-# Examples:
-#
-# Enable local logging only:
-# .\Configure-OneBank-Windows-Logging.ps1 -Role DC
-#
-# Enable local logging and configure Splunk UF:
-# .\Configure-OneBank-Windows-Logging.ps1 -Role DC -ConfigureSplunk -SplunkIndexer 192.168.60.10 -SplunkPort 9997
-#
-# Roles:
-# DC, WORKSTATION, IIS, MSSQL
+# set_logging_elastic_onebank.ps1
+# OneBank lab logging preparation for Elastic SIEM
+# Run as Administrator on every Windows machine.
+# This script enables Windows logging/auditing only. It does not install Elastic Agent.
+# Recommended roles: DC, WORKSTATION, IIS, MSSQL, FILESERVER
 
 param(
-    [ValidateSet("DC", "WORKSTATION", "IIS", "MSSQL")]
+    [ValidateSet("DC", "WORKSTATION", "IIS", "MSSQL", "FILESERVER")]
     [string]$Role = "WORKSTATION",
 
-    [switch]$ConfigureSplunk,
+    [string[]]$AuditPaths = @(
+        "C:\Exercise_Data",
+        "C:\ProgramData\OneBank",
+        "C:\OneBank",
+        "C:\Shares\IT_Backups",
+        "C:\Shares\AdminScripts",
+        "D:\Shares\IT_Backups",
+        "D:\Shares\AdminScripts"
+    ),
 
-    [string]$SplunkIndexer = "",
+    [switch]$ConfigureDomainObjectSacl,
 
-    [int]$SplunkPort = 9997,
+    [string[]]$ADAuditObjects = @(
+        "Domain Admins",
+        "svc_backup",
+        "morean.tal"
+    ),
 
-    [string]$Index = "onebank",
+    [switch]$EnableWindowsFirewallLog,
 
-    [string]$SysmonFolder = "C:\Install\Sysmon",
-
-    [string]$SysmonConfig = "C:\Install\Sysmon\sysmonconfig.xml"
+    [string]$FirewallLogPath = "C:\Windows\System32\LogFiles\Firewall\pfirewall.log"
 )
 
 function Assert-Admin {
@@ -39,9 +41,7 @@ function Assert-Admin {
 }
 
 function Enable-EventChannel {
-    param(
-        [string]$Channel
-    )
+    param([string]$Channel)
 
     try {
         wevtutil sl $Channel /e:true 2>$null
@@ -68,6 +68,9 @@ function Set-LogSize {
 }
 
 function Set-AuditPolicy {
+    # These subcategories cover the OneBank story:
+    # AD credentials for aturner, Kerberos TGS requests for svc_backup, SMB/share access with svc_backup,
+    # password spraying, RDP, account/group changes, GenericAll abuse evidence, process creation, and local privesc.
     $auditSubcategories = @(
         "Logon",
         "Logoff",
@@ -81,13 +84,25 @@ function Set-AuditPolicy {
         "User Account Management",
         "Security Group Management",
         "Computer Account Management",
+        "Directory Service Access",
         "Directory Service Changes",
+        "Directory Service Replication",
+        "Detailed Directory Service Replication",
         "File Share",
         "Detailed File Share",
         "File System",
+        "Handle Manipulation",
         "Filtering Platform Connection",
+        "Filtering Platform Packet Drop",
         "Removable Storage",
-        "Other Object Access Events"
+        "Other Object Access Events",
+        "Audit Policy Change",
+        "Authentication Policy Change",
+        "Authorization Policy Change",
+        "Sensitive Privilege Use",
+        "Other Privilege Use Events",
+        "Security System Extension",
+        "System Integrity"
     )
 
     foreach ($subcategory in $auditSubcategories) {
@@ -100,10 +115,9 @@ function Set-AuditPolicy {
         }
     }
 
-    # Include command line in Event ID 4688
     try {
+        # Include command line in Event ID 4688.
         New-Item -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System\Audit" -Force | Out-Null
-
         New-ItemProperty `
             -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System\Audit" `
             -Name "ProcessCreationIncludeCmdLine_Enabled" `
@@ -114,7 +128,7 @@ function Set-AuditPolicy {
         Write-Host "[OK] Enabled command line logging for Event ID 4688."
     }
     catch {
-        Write-Warning "Could not enable command line logging for process creation."
+        Write-Warning "Could not enable command line logging for Event ID 4688."
     }
 }
 
@@ -123,158 +137,122 @@ function Enable-PowerShellLogging {
         $base = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell"
 
         New-Item -Path "$base\ScriptBlockLogging" -Force | Out-Null
-        New-ItemProperty `
-            -Path "$base\ScriptBlockLogging" `
-            -Name "EnableScriptBlockLogging" `
-            -Value 1 `
-            -PropertyType DWord `
-            -Force | Out-Null
+        New-ItemProperty -Path "$base\ScriptBlockLogging" -Name "EnableScriptBlockLogging" -Value 1 -PropertyType DWord -Force | Out-Null
 
         New-Item -Path "$base\ModuleLogging\ModuleNames" -Force | Out-Null
-        New-ItemProperty `
-            -Path "$base\ModuleLogging" `
-            -Name "EnableModuleLogging" `
-            -Value 1 `
-            -PropertyType DWord `
-            -Force | Out-Null
-
-        New-ItemProperty `
-            -Path "$base\ModuleLogging\ModuleNames" `
-            -Name "*" `
-            -Value "*" `
-            -PropertyType String `
-            -Force | Out-Null
+        New-ItemProperty -Path "$base\ModuleLogging" -Name "EnableModuleLogging" -Value 1 -PropertyType DWord -Force | Out-Null
+        New-ItemProperty -Path "$base\ModuleLogging\ModuleNames" -Name "*" -Value "*" -PropertyType String -Force | Out-Null
 
         New-Item -Path "$base\Transcription" -Force | Out-Null
-        New-ItemProperty `
-            -Path "$base\Transcription" `
-            -Name "EnableTranscripting" `
-            -Value 1 `
-            -PropertyType DWord `
-            -Force | Out-Null
-
-        New-ItemProperty `
-            -Path "$base\Transcription" `
-            -Name "OutputDirectory" `
-            -Value "C:\ProgramData\OneBank\PowerShellTranscripts" `
-            -PropertyType String `
-            -Force | Out-Null
+        New-ItemProperty -Path "$base\Transcription" -Name "EnableTranscripting" -Value 1 -PropertyType DWord -Force | Out-Null
+        New-ItemProperty -Path "$base\Transcription" -Name "OutputDirectory" -Value "C:\ProgramData\OneBank\PowerShellTranscripts" -PropertyType String -Force | Out-Null
 
         New-Item -Path "C:\ProgramData\OneBank\PowerShellTranscripts" -ItemType Directory -Force | Out-Null
 
-        Write-Host "[OK] Enabled PowerShell logging."
+        Write-Host "[OK] Enabled PowerShell ScriptBlock, Module, and Transcript logging."
     }
     catch {
         Write-Warning "Could not enable PowerShell logging."
     }
 }
 
-function Configure-ExerciseFileAuditing {
-    $path = "C:\Exercise_Data"
+function Enable-FileAndShareAuditing {
+    param([string[]]$Paths)
 
-    try {
-        if (-not (Test-Path $path)) {
-            New-Item -Path $path -ItemType Directory -Force | Out-Null
+    foreach ($path in $Paths) {
+        try {
+            if (-not (Test-Path $path)) {
+                New-Item -Path $path -ItemType Directory -Force | Out-Null
+                Write-Host "[OK] Created audit path: $path"
+            }
+
+            $acl = Get-Acl $path
+
+            $rights = [System.Security.AccessControl.FileSystemRights]::ReadData -bor `
+                      [System.Security.AccessControl.FileSystemRights]::WriteData -bor `
+                      [System.Security.AccessControl.FileSystemRights]::AppendData -bor `
+                      [System.Security.AccessControl.FileSystemRights]::CreateFiles -bor `
+                      [System.Security.AccessControl.FileSystemRights]::CreateDirectories -bor `
+                      [System.Security.AccessControl.FileSystemRights]::Delete -bor `
+                      [System.Security.AccessControl.FileSystemRights]::ReadAttributes -bor `
+                      [System.Security.AccessControl.FileSystemRights]::WriteAttributes -bor `
+                      [System.Security.AccessControl.FileSystemRights]::ReadPermissions -bor `
+                      [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor `
+                      [System.Security.AccessControl.FileSystemRights]::TakeOwnership
+
+            $rule = New-Object System.Security.AccessControl.FileSystemAuditRule(
+                "Everyone",
+                $rights,
+                "ContainerInherit,ObjectInherit",
+                "None",
+                "Success,Failure"
+            )
+
+            $acl.AddAuditRule($rule)
+            Set-Acl -Path $path -AclObject $acl
+
+            Write-Host "[OK] Enabled NTFS SACL auditing on $path"
         }
-
-        $acl = Get-Acl $path
-
-        $rule = New-Object System.Security.AccessControl.FileSystemAuditRule(
-            "Everyone",
-            "ReadData,WriteData,AppendData,Delete,ReadAttributes,WriteAttributes,CreateFiles,CreateDirectories",
-            "ContainerInherit,ObjectInherit",
-            "None",
-            "Success,Failure"
-        )
-
-        $acl.AddAuditRule($rule)
-        Set-Acl -Path $path -AclObject $acl
-
-        Write-Host "[OK] Enabled file auditing on $path"
-    }
-    catch {
-        Write-Warning "Could not enable file auditing on $path"
+        catch {
+            Write-Warning "Could not enable NTFS SACL auditing on $path"
+            Write-Warning $_.Exception.Message
+        }
     }
 }
 
-function Install-Or-Update-Sysmon {
-    $sysmonExe = Join-Path $SysmonFolder "Sysmon64.exe"
-    $sysmonZip = Join-Path $SysmonFolder "Sysmon.zip"
-    $sysmonDownloadUrl = "https://download.sysinternals.com/files/Sysmon.zip"
+function Enable-ADObjectAuditing {
+    param([string[]]$Objects)
+
+    if ($Role -ne "DC") {
+        return
+    }
 
     try {
-        if (-not (Test-Path $SysmonFolder)) {
-            New-Item -Path $SysmonFolder -ItemType Directory -Force | Out-Null
-            Write-Host "[OK] Created Sysmon folder: $SysmonFolder"
-        }
-
-        if (-not (Test-Path $sysmonExe)) {
-            Write-Host "[INFO] Sysmon64.exe not found. Downloading Sysmon from Microsoft Sysinternals..."
-
-            try {
-                [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-                Invoke-WebRequest `
-                    -Uri $sysmonDownloadUrl `
-                    -OutFile $sysmonZip `
-                    -UseBasicParsing
-
-                Write-Host "[OK] Downloaded Sysmon ZIP to: $sysmonZip"
-            }
-            catch {
-                Write-Warning "Could not download Sysmon. Check internet connectivity from this machine."
-                Write-Warning "You can manually place Sysmon64.exe in $SysmonFolder and rerun the script."
-                return
-            }
-
-            try {
-                Expand-Archive `
-                    -Path $sysmonZip `
-                    -DestinationPath $SysmonFolder `
-                    -Force
-
-                Write-Host "[OK] Extracted Sysmon to: $SysmonFolder"
-            }
-            catch {
-                Write-Warning "Could not extract Sysmon ZIP."
-                return
-            }
-        }
-
-        if (-not (Test-Path $sysmonExe)) {
-            Write-Warning "Sysmon64.exe still not found after download/extract. Skipping Sysmon install."
-            return
-        }
-
-        $service = Get-Service -Name "Sysmon64" -ErrorAction SilentlyContinue
-
-        if ($service) {
-            if (Test-Path $SysmonConfig) {
-                & $sysmonExe -c $SysmonConfig
-                Write-Host "[OK] Sysmon already installed. Updated Sysmon config: $SysmonConfig"
-            }
-            else {
-                & $sysmonExe -c
-                Write-Host "[OK] Sysmon already installed. No config file found, current config was displayed."
-            }
-        }
-        else {
-            if (Test-Path $SysmonConfig) {
-                & $sysmonExe -accepteula -i $SysmonConfig
-                Write-Host "[OK] Installed Sysmon with config: $SysmonConfig"
-            }
-            else {
-                & $sysmonExe -accepteula -i
-                Write-Host "[OK] Installed Sysmon with default configuration."
-                Write-Warning "Default Sysmon config is limited. Recommended to add sysmonconfig.xml later."
-            }
-        }
-
-        Enable-EventChannel "Microsoft-Windows-Sysmon/Operational"
+        Import-Module ActiveDirectory -ErrorAction Stop
     }
     catch {
-        Write-Warning "Could not install or update Sysmon."
-        Write-Warning $_.Exception.Message
+        Write-Warning "ActiveDirectory module not available. Skipping AD object SACL configuration."
+        return
+    }
+
+    foreach ($objectName in $Objects) {
+        try {
+            $adObject = Get-ADObject -LDAPFilter "(|(cn=$objectName)(sAMAccountName=$objectName))" -Properties DistinguishedName -ErrorAction Stop | Select-Object -First 1
+
+            if (-not $adObject) {
+                Write-Warning "AD object not found: $objectName"
+                continue
+            }
+
+            $adPath = "AD:\$($adObject.DistinguishedName)"
+            $acl = Get-Acl $adPath
+
+            $identity = New-Object System.Security.Principal.NTAccount("Everyone")
+            $rights = [System.DirectoryServices.ActiveDirectoryRights]::GenericAll -bor `
+                      [System.DirectoryServices.ActiveDirectoryRights]::WriteDacl -bor `
+                      [System.DirectoryServices.ActiveDirectoryRights]::WriteOwner -bor `
+                      [System.DirectoryServices.ActiveDirectoryRights]::WriteProperty -bor `
+                      [System.DirectoryServices.ActiveDirectoryRights]::ExtendedRight
+
+            $auditFlags = [System.Security.AccessControl.AuditFlags]::Success -bor [System.Security.AccessControl.AuditFlags]::Failure
+            $inheritance = [System.DirectoryServices.ActiveDirectorySecurityInheritance]::None
+
+            $rule = New-Object System.DirectoryServices.ActiveDirectoryAuditRule(
+                $identity,
+                $rights,
+                $auditFlags,
+                $inheritance
+            )
+
+            $acl.AddAuditRule($rule)
+            Set-Acl -Path $adPath -AclObject $acl
+
+            Write-Host "[OK] Enabled AD object SACL auditing on: $($adObject.DistinguishedName)"
+        }
+        catch {
+            Write-Warning "Could not configure AD object SACL for: $objectName"
+            Write-Warning $_.Exception.Message
+        }
     }
 }
 
@@ -297,7 +275,6 @@ function Configure-IISLogging {
             Set-ItemProperty "IIS:\Sites\$($site.Name)" -Name logFile.logFormat -Value "W3C"
             Set-ItemProperty "IIS:\Sites\$($site.Name)" -Name logFile.directory -Value "%SystemDrive%\inetpub\logs\LogFiles"
             Set-ItemProperty "IIS:\Sites\$($site.Name)" -Name logFile.period -Value "Daily"
-
             Set-ItemProperty "IIS:\Sites\$($site.Name)" -Name logFile.logExtFileFlags -Value `
                 "Date,Time,ClientIP,UserName,SiteName,ComputerName,ServerIP,Method,UriStem,UriQuery,HttpStatus,Win32Status,BytesSent,BytesRecv,TimeTaken,ServerPort,UserAgent,Referer,ProtocolVersion,Host,HttpSubStatus"
 
@@ -306,216 +283,81 @@ function Configure-IISLogging {
     }
     catch {
         Write-Warning "Could not configure IIS logging."
+        Write-Warning $_.Exception.Message
     }
 }
 
-function Configure-SplunkForwarder {
-    if (-not $ConfigureSplunk) {
-        Write-Host "[INFO] Splunk configuration skipped. ConfigureSplunk switch was not used."
-        return
-    }
-
-    if ([string]::IsNullOrWhiteSpace($SplunkIndexer)) {
-        Write-Warning "ConfigureSplunk was used, but SplunkIndexer is empty. Skipping Splunk configuration."
-        return
-    }
-
-    $ufHomeCandidates = @(
-        "$env:ProgramFiles\SplunkUniversalForwarder",
-        "${env:ProgramFiles(x86)}\SplunkUniversalForwarder"
-    )
-
-    $ufHome = $ufHomeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-
-    if (-not $ufHome) {
-        Write-Warning "Splunk Universal Forwarder not found. Install UF first, then rerun this script with -ConfigureSplunk."
+function Configure-WindowsFirewallLogging {
+    if (-not $EnableWindowsFirewallLog) {
         return
     }
 
     try {
-        $appLocal = Join-Path $ufHome "etc\apps\TA-onebank-logs\local"
-        New-Item -Path $appLocal -ItemType Directory -Force | Out-Null
+        $firewallLogFolder = Split-Path $FirewallLogPath -Parent
+        New-Item -Path $firewallLogFolder -ItemType Directory -Force | Out-Null
 
-        $inputsPath = Join-Path $appLocal "inputs.conf"
+        Set-NetFirewallProfile -Profile Domain,Private,Public `
+            -LogAllowed True `
+            -LogBlocked True `
+            -LogFileName $FirewallLogPath `
+            -LogMaxSizeKilobytes 32767
 
-        $commonInputs = @"
-[WinEventLog://Security]
-disabled = 0
-index = $Index
-renderXml = true
-
-[WinEventLog://System]
-disabled = 0
-index = $Index
-
-[WinEventLog://Application]
-disabled = 0
-index = $Index
-
-[WinEventLog://Windows PowerShell]
-disabled = 0
-index = $Index
-
-[WinEventLog://Microsoft-Windows-PowerShell/Operational]
-disabled = 0
-index = $Index
-renderXml = true
-
-[WinEventLog://Microsoft-Windows-Sysmon/Operational]
-disabled = 0
-index = $Index
-renderXml = true
-
-[WinEventLog://Microsoft-Windows-Windows Defender/Operational]
-disabled = 0
-index = $Index
-
-[WinEventLog://Microsoft-Windows-TaskScheduler/Operational]
-disabled = 0
-index = $Index
-
-[WinEventLog://Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational]
-disabled = 0
-index = $Index
-
-[WinEventLog://Microsoft-Windows-TerminalServices-LocalSessionManager/Operational]
-disabled = 0
-index = $Index
-
-[monitor://C:\ProgramData\OneBank\PowerShellTranscripts\*.txt]
-disabled = 0
-index = $Index
-sourcetype = powershell_transcript
-
-[monitor://C:\Exercise_Data\*.log]
-disabled = 0
-index = $Index
-sourcetype = onebank_exercise_file
-"@
-
-        $roleInputs = ""
-
-        if ($Role -eq "DC") {
-            $roleInputs += @"
-
-[WinEventLog://Directory Service]
-disabled = 0
-index = $Index
-renderXml = true
-
-[WinEventLog://DNS Server]
-disabled = 0
-index = $Index
-"@
-        }
-
-        if ($Role -eq "IIS") {
-            $roleInputs += @"
-
-[monitor://C:\inetpub\logs\LogFiles\*\*.log]
-disabled = 0
-index = $Index
-sourcetype = ms:iis:auto
-crcSalt = <SOURCE>
-"@
-        }
-
-        if ($Role -eq "MSSQL") {
-            $roleInputs += @"
-
-[monitor://C:\Program Files\Microsoft SQL Server\*\MSSQL\Log\ERRORLOG*]
-disabled = 0
-index = $Index
-sourcetype = mssql:errorlog
-crcSalt = <SOURCE>
-
-[monitor://D:\SQLAuditExport\*.csv]
-disabled = 0
-index = $Index
-sourcetype = mssql:audit:csv
-crcSalt = <SOURCE>
-"@
-        }
-
-        Set-Content -Path $inputsPath -Value ($commonInputs + $roleInputs) -Encoding ASCII
-
-        $systemLocal = Join-Path $ufHome "etc\system\local"
-        New-Item -Path $systemLocal -ItemType Directory -Force | Out-Null
-
-        $outputsPath = Join-Path $systemLocal "outputs.conf"
-
-        $outputs = @"
-[tcpout]
-defaultGroup = onebank_indexers
-
-[tcpout:onebank_indexers]
-server = $SplunkIndexer`:$SplunkPort
-"@
-
-        Set-Content -Path $outputsPath -Value $outputs -Encoding ASCII
-
-        $splunkService = Get-Service -Name "SplunkForwarder" -ErrorAction SilentlyContinue
-
-        if ($splunkService) {
-            Restart-Service SplunkForwarder
-            Write-Host "[OK] Splunk UF configured and restarted. Role: $Role"
-        }
-        else {
-            Write-Warning "SplunkForwarder service not found. Config files were created, but service was not restarted."
-        }
+        Write-Host "[OK] Enabled Windows Firewall text log: $FirewallLogPath"
     }
     catch {
-        Write-Warning "Could not configure Splunk Forwarder."
+        Write-Warning "Could not enable Windows Firewall text log."
+        Write-Warning $_.Exception.Message
     }
 }
 
 Assert-Admin
 
 Write-Host "=============================================="
-Write-Host "Configuring OneBank Windows logging"
+Write-Host "Configuring OneBank logging for Elastic SIEM"
 Write-Host "Role: $Role"
-Write-Host "Configure Splunk: $ConfigureSplunk"
+Write-Host "Sysmon: not configured by this script"
+Write-Host "Splunk: not configured by this script"
 Write-Host "=============================================="
 
 # Common Windows channels
+Enable-EventChannel "Windows PowerShell"
 Enable-EventChannel "Microsoft-Windows-PowerShell/Operational"
 Enable-EventChannel "Microsoft-Windows-TaskScheduler/Operational"
 Enable-EventChannel "Microsoft-Windows-Windows Defender/Operational"
 Enable-EventChannel "Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational"
 Enable-EventChannel "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational"
-Enable-EventChannel "Microsoft-Windows-Sysmon/Operational"
+Enable-EventChannel "Microsoft-Windows-SMBServer/Audit"
+Enable-EventChannel "Microsoft-Windows-SMBServer/Operational"
+Enable-EventChannel "Microsoft-Windows-SmbClient/Security"
+Enable-EventChannel "Microsoft-Windows-SmbClient/Connectivity"
 
 # DC-specific channels
 if ($Role -eq "DC") {
     Enable-EventChannel "Directory Service"
     Enable-EventChannel "DNS Server"
+    Enable-EventChannel "Microsoft-Windows-NTLM/Operational"
 }
 
-# Increase useful log sizes
+# Useful log sizes
 Set-LogSize "Security" 1073741824
 Set-LogSize "System" 268435456
 Set-LogSize "Application" 268435456
-Set-LogSize "Microsoft-Windows-PowerShell/Operational" 268435456
-Set-LogSize "Microsoft-Windows-Sysmon/Operational" 536870912
-Set-LogSize "Microsoft-Windows-TaskScheduler/Operational" 134217728
+Set-LogSize "Windows PowerShell" 268435456
+Set-LogSize "Microsoft-Windows-PowerShell/Operational" 536870912
+Set-LogSize "Microsoft-Windows-TaskScheduler/Operational" 268435456
 Set-LogSize "Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational" 134217728
 Set-LogSize "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" 134217728
+Set-LogSize "Microsoft-Windows-SMBServer/Audit" 268435456
+Set-LogSize "Microsoft-Windows-SMBServer/Operational" 268435456
 
-# Main configuration
 Set-AuditPolicy
 Enable-PowerShellLogging
-Configure-ExerciseFileAuditing
-Install-Or-Update-Sysmon
+Enable-FileAndShareAuditing -Paths $AuditPaths
+Enable-ADObjectAuditing -Objects $ADAuditObjects
 Configure-IISLogging
-Configure-SplunkForwarder
+Configure-WindowsFirewallLogging
 
 Write-Host "=============================================="
-Write-Host "Done."
-Write-Host "Local logging was configured."
-if ($ConfigureSplunk -and $SplunkIndexer) {
-    Write-Host "Splunk configuration was attempted for indexer: $SplunkIndexer`:$SplunkPort"
-}
-else {
-    Write-Host "Splunk configuration was skipped."
-}
+Write-Host "Done. Windows logging/auditing is configured."
+Write-Host "Next step: make sure Elastic Agent policy collects Security, System, Application, PowerShell, TaskScheduler, RDP, SMB, Defender, Directory Service, DNS, IIS logs, and Windows Firewall log if enabled."
 Write-Host "=============================================="
